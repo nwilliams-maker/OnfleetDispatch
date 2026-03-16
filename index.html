@@ -320,7 +320,7 @@
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
     const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
     
-    // 1. Copy to clipboard first (Reliable method)
+    // 1. FORCED CLIPBOARD COPY (Always works)
     const tempInput = document.createElement('textarea');
     tempInput.value = link;
     document.body.appendChild(tempInput);
@@ -328,34 +328,32 @@
     document.execCommand('copy');
     document.body.removeChild(tempInput);
 
-    // 2. Prepare Email
-    const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
-    const body = encodeURIComponent(
-        `Dear ${d.icn},\n\n` +
-        `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
-        `ROUTE DETAILS:\n` +
-        `• Work Order: #${d.wo}\n` +
-        `• Due Date: ${displayDate}\n` +
-        `• Compensation: $${d.comp}\n` +
-        `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
-        `Please click the link below to authorize the route and compensation.\n\n` +
-        `REVIEW LINK:\n${link}\n\n` +
-        `Regards,\nTerraboost Media Dispatch`
-    );
+    // 2. Setup Email Parts
+    const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
+    const body = `Dear ${d.icn},\n\n` +
+                 `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
+                 `ROUTE DETAILS:\n` +
+                 `• Work Order: #${d.wo}\n` +
+                 `• Due Date: ${displayDate}\n` +
+                 `• Compensation: $${d.comp}\n` +
+                 `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
+                 `REVIEW LINK:\n${link}\n\n` +
+                 `Regards,\nTerraboost Media Dispatch`;
 
-    // 3. CREATE HIDDEN LINK AND CLICK IT (Best for bypassing blockers)
-    const mailtoUrl = `mailto:${d.ice}?subject=${subject}&body=${body}`;
-    
-    if (mailtoUrl.length > 2000) {
-        alert("Route is too long for an auto-email. The link has been COPIED to your clipboard. Please paste it into a manual email.");
+    // 3. LENGTH CHECK & TRIGGER
+    const mailtoUrl = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    if (mailtoUrl.length > 1900) {
+        // FALLBACK: If the URL is too long, open a blank Gmail/Email window
+        alert("Route is large! Link copied to clipboard. Opening email... please PASTE (Ctrl+V) the link into the body.");
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${d.ice}&su=${encodeURIComponent(subject)}`, '_blank');
     } else {
+        // STANDARD: Create link and click
         const mailLink = document.createElement('a');
         mailLink.href = mailtoUrl;
-        mailLink.style.display = 'none';
         document.body.appendChild(mailLink);
-        mailLink.click(); // Programmatic click
+        mailLink.click();
         document.body.removeChild(mailLink);
-        
         alert("Authorization Link Copied & Email Drafted!");
     }
 }
