@@ -148,32 +148,47 @@
         }
 
         async function fetchOnfleetTasks() {
-            const homeAddress = document.getElementById('ic_address').value;
-            if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
+    const homeAddress = document.getElementById('ic_address').value;
+    if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
 
-            const loader = document.getElementById('loaderOverlay');
-            loader.classList.remove('hidden'); loader.classList.add('flex');
+    const loader = document.getElementById('loaderOverlay');
+    const syncBtn = document.getElementById('syncBtn');
+    
+    // UI Loading State
+    loader.classList.remove('hidden'); 
+    loader.classList.add('flex');
+    syncBtn.innerText = "⏳ Searching Onfleet...";
+    syncBtn.disabled = true;
+    syncBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            try {
-                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-                const addresses = await response.json();
+    try {
+        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+        const addresses = await response.json();
 
-                if (addresses.error) throw new Error(addresses.error);
+        if (addresses.error) throw new Error(addresses.error);
 
-                if (addresses.length === 0) {
-                    alert("No unassigned tasks found within 30 miles of this contractor.");
-                } else {
-                    document.getElementById('locations').value = addresses.join('\n');
-                    calculateLargeRoute();
-                    alert(`Found and pulled ${addresses.length} nearby tasks!`);
-                }
-            } catch (error) {
-                alert("Sync Error: " + error.message);
-            } finally {
-                loader.classList.add('hidden');
-            }
+        if (addresses.length === 0) {
+            alert("No unassigned tasks found within 30 miles of this contractor.");
+            document.getElementById('locations').value = "";
+        } else {
+            // Join unique addresses into the textarea
+            document.getElementById('locations').value = addresses.join('\n');
+            
+            // Auto-calculate the route preview on the map
+            calculateLargeRoute();
+            
+            alert(`Success! Found ${addresses.length} unique locations near the contractor.`);
         }
-
+    } catch (error) {
+        alert("Sync Error: " + error.message);
+    } finally {
+        // Reset UI State
+        loader.classList.add('hidden');
+        syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
+        syncBtn.disabled = false;
+        syncBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
         function handleManualEdit() {
             const btn = document.getElementById('saveBtn');
             btn.disabled = false;
