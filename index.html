@@ -223,35 +223,40 @@
         }
 
         function calculateLargeRoute() {
-            clearTimeout(inputTimer);
-            const loader = document.getElementById('loaderOverlay');
-            const home = document.getElementById('ic_address').value.trim();
-            const rawStops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
-            
-            const stops = rawStops.map(s => s.replace(/\s\(\d+\sJobs\)$/, "").trim());
+    clearTimeout(inputTimer);
+    const loader = document.getElementById('loaderOverlay');
+    const home = document.getElementById('ic_address').value.trim();
+    const rawStops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
+    
+    // 1. STRIP THE BADGE FOR GOOGLE MAPS
+    const cleanStops = rawStops.map(s => s.replace(/\s\(\d+\sJobs\)$/, "").trim());
 
-            inputTimer = setTimeout(() => {
-                if (stops.length === 0 || !home) return;
-                loader.classList.remove('hidden'); loader.classList.add('flex');
-                directionsService.route({
-                    origin: home, destination: home,
-                    waypoints: stops.map(l => ({location: l, stopover: true})),
-                    optimizeWaypoints: true, travelMode: google.maps.TravelMode.DRIVING
-                }, (result, status) => {
-                    if (status === 'OK') {
-                        directionsRenderer.setDirections(result);
-                        let m = 0, s = 0;
-                        result.routes[0].legs.forEach(leg => { m += leg.distance.value; s += leg.duration.value; });
-                        document.getElementById('mileage_display').innerText = (m * 0.000621371).toFixed(1);
-                        const hrs = Math.floor(s/3600), mins = Math.floor((s%3600)/60);
-                        document.getElementById('time_display').innerText = hrs > 0 ? hrs+"h "+mins+"m" : mins+"m";
-                        window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
-                    }
-                    loader.classList.add('hidden');
-                });
-            }, 800);
-        }
-
+    inputTimer = setTimeout(() => {
+        if (cleanStops.length === 0 || !home) return; // Use cleanStops here
+        loader.classList.remove('hidden'); loader.classList.add('flex');
+        
+        directionsService.route({
+            origin: home, 
+            destination: home,
+            waypoints: cleanStops.map(l => ({location: l, stopover: true})), // Use cleanStops here
+            optimizeWaypoints: true, 
+            travelMode: google.maps.TravelMode.DRIVING
+        }, (result, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(result);
+                let m = 0, s = 0;
+                result.routes[0].legs.forEach(leg => { m += leg.distance.value; s += leg.duration.value; });
+                document.getElementById('mileage_display').innerText = (m * 0.000621371).toFixed(1);
+                const hrs = Math.floor(s/3600), mins = Math.floor((s%3600)/60);
+                document.getElementById('time_display').innerText = hrs > 0 ? hrs+"h "+mins+"m" : mins+"m";
+                
+                // 2. IMPORTANT: Keep the optimized sequence clean for the URL generator
+                window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => cleanStops[i]), home];
+            }
+            loader.classList.add('hidden');
+        });
+    }, 800);
+}
         function toggleDecisionView() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
             const block = document.getElementById('reason_block');
@@ -315,7 +320,15 @@
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
     const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
     
-    // 1. Prepare Email Data
+    // 1. Copy to clipboard first (Reliable method)
+    const tempInput = document.createElement('textarea');
+    tempInput.value = link;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempInput);
+
+    // 2. Prepare Email
     const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
     const body = encodeURIComponent(
         `Dear ${d.icn},\n\n` +
@@ -330,18 +343,21 @@
         `Regards,\nTerraboost Media Dispatch`
     );
 
-    // 2. TRIGGER EMAIL POPUP IMMEDIATELY (Bypasses Popup Blocker)
-    window.location.href = `mailto:${d.ice}?subject=${subject}&body=${body}`;
-
-    // 3. Copy to clipboard in the background
-    const el = document.createElement('textarea');
-    el.value = link;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-
-    alert("Authorization Link Copied & Gmail Drafted!");
+    // 3. CREATE HIDDEN LINK AND CLICK IT (Best for bypassing blockers)
+    const mailtoUrl = `mailto:${d.ice}?subject=${subject}&body=${body}`;
+    
+    if (mailtoUrl.length > 2000) {
+        alert("Route is too long for an auto-email. The link has been COPIED to your clipboard. Please paste it into a manual email.");
+    } else {
+        const mailLink = document.createElement('a');
+        mailLink.href = mailtoUrl;
+        mailLink.style.display = 'none';
+        document.body.appendChild(mailLink);
+        mailLink.click(); // Programmatic click
+        document.body.removeChild(mailLink);
+        
+        alert("Authorization Link Copied & Email Drafted!");
+    }
 }
         async function submitToFormspree() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
