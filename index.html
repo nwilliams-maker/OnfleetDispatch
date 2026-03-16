@@ -297,60 +297,70 @@
         }
 
         function generateCertifiedLink() {
-    const rawDate = document.getElementById('due_date').value;
-    let displayDate = 'N/A';
-    if (rawDate) {
-        const p = rawDate.split('-');
-        displayDate = `${p[1]}/${p[2]}/${p[0]}`;
-    }
-
-    const d = {
-        icn: document.getElementById('ic_name_setup').value,
-        ice: document.getElementById('ic_email_setup').value,
-        wo: document.getElementById('task_num').value,
-        due: rawDate,
-        comp: document.getElementById('comp').value,
-        mi: document.getElementById('mileage_display').innerText,
-        time: document.getElementById('time_display').innerText,
-        locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
-    };
-    
-    if (!d.ice || d.mi === "0.0") return alert("Missing data.");
-    
-    const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
-    const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
-    
-    // 1. Setup Email Content
-    const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
-    const body = `Dear ${d.icn},\n\n` +
-                 `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
-                 `ROUTE DETAILS:\n` +
-                 `• Work Order: #${d.wo}\n` +
-                 `• Due Date: ${displayDate}\n` +
-                 `• Compensation: $${d.comp}\n` +
-                 `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
-                 `REVIEW LINK:\n${link}\n\n` +
-                 `Regards,\nTerraboost Media Dispatch`;
-
-    // 2. TRIGGER EMAIL POPUP IMMEDIATELY
-    // This MUST be the first major action to satisfy browser security
-    window.open(`mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self');
-
-    // 3. COPY TO CLIPBOARD (Background fallback)
-    const tempInput = document.createElement('textarea');
-    tempInput.value = link;
-    tempInput.style.position = 'fixed'; // Avoid scrolling to bottom
-    document.body.appendChild(tempInput);
-    tempInput.select();
     try {
-        document.execCommand('copy');
-    } catch (err) {
-        console.error('Clipboard failed', err);
-    }
-    document.body.removeChild(tempInput);
+        const rawDate = document.getElementById('due_date').value;
+        let displayDate = 'N/A';
+        if (rawDate) {
+            const p = rawDate.split('-');
+            displayDate = `${p[1]}/${p[2]}/${p[0]}`;
+        }
 
-    // 4. Alert the user (After the popup has been triggered)
-    console.log("Authorization Link Generated: " + link);
+        const d = {
+            icn: document.getElementById('ic_name_setup').value,
+            ice: document.getElementById('ic_email_setup').value,
+            wo: document.getElementById('task_num').value,
+            due: rawDate,
+            comp: document.getElementById('comp').value,
+            mi: document.getElementById('mileage_display').innerText,
+            time: document.getElementById('time_display').innerText,
+            locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
+        };
+        
+        if (!d.ice || d.mi === "0.0") {
+            alert("Missing data. Please ensure contractor email and route are present.");
+            return;
+        }
+        
+        const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+        const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
+        
+        // 1. IMMEDIATE COPY TO CLIPBOARD
+        const tempInput = document.createElement('textarea');
+        tempInput.value = link;
+        tempInput.style.position = 'absolute';
+        tempInput.style.left = '-9999px';
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+
+        // 2. PREPARE EMAIL CONTENT
+        const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
+        const body = `Dear ${d.icn},\n\n` +
+                     `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
+                     `ROUTE DETAILS:\n` +
+                     `• Work Order: #${d.wo}\n` +
+                     `• Due Date: ${displayDate}\n` +
+                     `• Compensation: $${d.comp}\n` +
+                     `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
+                     `REVIEW LINK:\n${link}\n\n` +
+                     `Regards,\nTerraboost Media Dispatch`;
+
+        // 3. THE "HIDDEN ANCHOR" METHOD (Most compatible)
+        const mailtoLink = document.createElement('a');
+        mailtoLink.href = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // This makes the browser treat it as a real link click
+        document.body.appendChild(mailtoLink);
+        mailtoLink.click();
+        document.body.removeChild(mailtoLink);
+
+        alert("Success! Link copied to clipboard and Gmail drafted.");
+        
+    } catch (err) {
+        console.error("Critical Error in generateCertifiedLink:", err);
+        alert("Error generating link. Check console for details.");
+    }
 }
         async function submitToFormspree() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
