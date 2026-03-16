@@ -63,7 +63,7 @@
                     <div class="space-y-6">
                         <div class="flex justify-between items-end mb-2">
                             <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">Job Locations</label>
-                            <button type="button" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
+                            <button type="button" id="syncBtn" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
                                 🔄 Sync Nearby Onfleet Tasks
                             </button>
                         </div>
@@ -136,8 +136,8 @@
 
     <script>
         let map, directionsService, directionsRenderer, inputTimer;
-        // REPLACE THE URL BELOW WITH YOUR APPS SCRIPT DEPLOYMENT URL
-        const webAppUrl = "https://script.google.com/macros/s/AKfycbwBdijlZOvbmP4lA_GYvtckedruXdHfhx1qCDMFXbCOjA6Qiv5gax_FY69Kp6ujpsjYHA/exec"; 
+        // UPDATE THIS URL AFTER YOUR NEW DEPLOYMENT
+        const webAppUrl = "https://script.google.com/macros/s/AKfycby0ksbaRk8DV2nNkMs6pTI_4NGsR7GQjBxzD7l_m6pF5rvK6FVVd5HKnvNxcSBCHVFJ/exec"; 
         const formspreeUrl = "https://formspree.io/f/meerlqll"; 
 
         function initMap() {
@@ -148,47 +148,45 @@
         }
 
         async function fetchOnfleetTasks() {
-    const homeAddress = document.getElementById('ic_address').value;
-    if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
+            const homeAddress = document.getElementById('ic_address').value;
+            if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
 
-    const loader = document.getElementById('loaderOverlay');
-    const syncBtn = document.getElementById('syncBtn');
-    
-    // UI Loading State
-    loader.classList.remove('hidden'); 
-    loader.classList.add('flex');
-    syncBtn.innerText = "⏳ Searching Onfleet...";
-    syncBtn.disabled = true;
-    syncBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-    try {
-        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-        const addresses = await response.json();
-
-        if (addresses.error) throw new Error(addresses.error);
-
-        if (addresses.length === 0) {
-            alert("No unassigned tasks found within 30 miles of this contractor.");
-            document.getElementById('locations').value = "";
-        } else {
-            // Join unique addresses into the textarea
-            document.getElementById('locations').value = addresses.join('\n');
+            const loader = document.getElementById('loaderOverlay');
+            const syncBtn = document.getElementById('syncBtn');
             
-            // Auto-calculate the route preview on the map
-            calculateLargeRoute();
-            
-            alert(`Success! Found ${addresses.length} unique locations near the contractor.`);
+            loader.classList.remove('hidden'); loader.classList.add('flex');
+            syncBtn.innerText = "⏳ Counting Jobs...";
+            syncBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+                const addressData = await response.json();
+
+                if (addressData.error) throw new Error(addressData.error);
+
+                const addresses = Object.keys(addressData);
+
+                if (addresses.length === 0) {
+                    alert("No unassigned tasks found within 30 miles.");
+                    document.getElementById('locations').value = "";
+                } else {
+                    const formattedList = addresses.map(addr => {
+                        const count = addressData[addr];
+                        return count > 1 ? `${addr} (${count} Jobs)` : addr;
+                    });
+                    document.getElementById('locations').value = formattedList.join('\n');
+                    calculateLargeRoute();
+                    alert(`Success! Found ${addresses.length} unique locations.`);
+                }
+            } catch (error) {
+                alert("Sync Error: " + error.message);
+            } finally {
+                loader.classList.add('hidden');
+                syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
+                syncBtn.disabled = false;
+            }
         }
-    } catch (error) {
-        alert("Sync Error: " + error.message);
-    } finally {
-        // Reset UI State
-        loader.classList.add('hidden');
-        syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
-        syncBtn.disabled = false;
-        syncBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    }
-}
+
         function handleManualEdit() {
             const btn = document.getElementById('saveBtn');
             btn.disabled = false;
@@ -229,7 +227,11 @@
             clearTimeout(inputTimer);
             const loader = document.getElementById('loaderOverlay');
             const home = document.getElementById('ic_address').value.trim();
-            const stops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
+            const rawStops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
+            
+            // Clean stops for Google Maps (strip the Jobs count badge)
+            const stops = rawStops.map(s => s.replace(/\s\(\d+\sJobs\)$/, "").trim());
+
             inputTimer = setTimeout(() => {
                 if (stops.length === 0 || !home) return;
                 loader.classList.remove('hidden'); loader.classList.add('flex');
@@ -269,7 +271,7 @@
             const origin = encodeURIComponent(stops[0]);
             const dest = encodeURIComponent(stops[stops.length-1]);
             const waypoints = stops.slice(1, -1).map(w => encodeURIComponent(w)).join('/');
-            return `https://www.google.com/maps/dir/${origin}/${waypoints}/${dest}/data=!4m2!4m1!3e0`;
+            return `https://www.google.com/maps/dir/${origin}/${waypoints}/${dest}/`;
         }
 
         function viewRoute(limit) {
