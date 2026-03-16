@@ -355,7 +355,7 @@
         document.body.removeChild(mailAnchor);
 
         // 4. CONFIRMATION
-        alert("✅ Success!\n\n1. Authorization link copied to clipboard.\n2. Email draft opened in your default mail app.");
+        alert("✅ Success!\n\n1. Authorization link copied to clipboard.\n2. Email draft opened in your default mail app. IF Email does not open then there is an Error: Possible Fix, make sure that Default Mailto App is selected as Outlook/Gmail in your PC's settings -if it is Chrome, the email will not open- ");
         
     } catch (err) {
         console.error("Link Generation Error:", err);
