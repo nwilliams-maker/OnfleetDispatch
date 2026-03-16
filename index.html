@@ -292,49 +292,57 @@
         }
 
         function generateCertifiedLink() {
-            const rawDate = document.getElementById('due_date').value;
-            let displayDate = 'N/A';
-            if (rawDate) {
-                const p = rawDate.split('-');
-                displayDate = `${p[1]}/${p[2]}/${p[0]}`;
-            }
+    const rawDate = document.getElementById('due_date').value;
+    let displayDate = 'N/A';
+    if (rawDate) {
+        const p = rawDate.split('-');
+        displayDate = `${p[1]}/${p[2]}/${p[0]}`;
+    }
 
-            const d = {
-                icn: document.getElementById('ic_name_setup').value,
-                ice: document.getElementById('ic_email_setup').value,
-                wo: document.getElementById('task_num').value,
-                due: rawDate,
-                comp: document.getElementById('comp').value,
-                mi: document.getElementById('mileage_display').innerText,
-                time: document.getElementById('time_display').innerText,
-                locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
-            };
-            
-            if (!d.ice || d.mi === "0.0") return alert("Missing data.");
-            
-            const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
-            const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
-            
-            navigator.clipboard.writeText(link).then(() => {
-                const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
-                const body = encodeURIComponent(
-                    `Dear ${d.icn},\n\n` +
-                    `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
-                    `ROUTE DETAILS:\n` +
-                    `• Work Order: #${d.wo}\n` +
-                    `• Due Date: ${displayDate}\n` +
-                    `• Compensation: $${d.comp}\n` +
-                    `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
-                    `Please click the link below to authorize the route and compensation.\n\n` +
-                    `REVIEW LINK:\n${link}\n\n` +
-                    `Regards,\nTerraboost Media Dispatch`
-                );
+    const d = {
+        icn: document.getElementById('ic_name_setup').value,
+        ice: document.getElementById('ic_email_setup').value,
+        wo: document.getElementById('task_num').value,
+        due: rawDate,
+        comp: document.getElementById('comp').value,
+        mi: document.getElementById('mileage_display').innerText,
+        time: document.getElementById('time_display').innerText,
+        locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
+    };
+    
+    if (!d.ice || d.mi === "0.0") return alert("Missing data.");
+    
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+    const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
+    
+    // 1. Prepare Email Data
+    const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
+    const body = encodeURIComponent(
+        `Dear ${d.icn},\n\n` +
+        `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
+        `ROUTE DETAILS:\n` +
+        `• Work Order: #${d.wo}\n` +
+        `• Due Date: ${displayDate}\n` +
+        `• Compensation: $${d.comp}\n` +
+        `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
+        `Please click the link below to authorize the route and compensation.\n\n` +
+        `REVIEW LINK:\n${link}\n\n` +
+        `Regards,\nTerraboost Media Dispatch`
+    );
 
-                window.location.href = `mailto:${d.ice}?subject=${subject}&body=${body}`;
-                alert("Authorization Link Copied & Email Drafted!");
-            });
-        }
+    // 2. TRIGGER EMAIL POPUP IMMEDIATELY (Bypasses Popup Blocker)
+    window.location.href = `mailto:${d.ice}?subject=${subject}&body=${body}`;
 
+    // 3. Copy to clipboard in the background
+    const el = document.createElement('textarea');
+    el.value = link;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+
+    alert("Authorization Link Copied & Gmail Drafted!");
+}
         async function submitToFormspree() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
             const sig = document.getElementById('typed_sig').value;
