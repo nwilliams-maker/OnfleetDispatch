@@ -317,24 +317,25 @@
         };
         
         if (!d.ice || d.mi === "0.0") {
-            alert("Missing data. Please ensure contractor email and route are present.");
+            alert("⚠️ Missing Data: Please ensure the Contractor Email and Route are populated.");
             return;
         }
         
+        // Create the encoded link
         const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
         const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
         
-        // 1. IMMEDIATE COPY TO CLIPBOARD
+        // 1. CLIPBOARD COPY (Synchronous & Reliable)
         const tempInput = document.createElement('textarea');
         tempInput.value = link;
-        tempInput.style.position = 'absolute';
+        tempInput.style.position = 'fixed';
         tempInput.style.left = '-9999px';
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand('copy');
         document.body.removeChild(tempInput);
 
-        // 2. PREPARE EMAIL CONTENT
+        // 2. CONSTRUCT MAILTO
         const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
         const body = `Dear ${d.icn},\n\n` +
                      `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
@@ -346,20 +347,19 @@
                      `REVIEW LINK:\n${link}\n\n` +
                      `Regards,\nTerraboost Media Dispatch`;
 
-        // 3. THE "HIDDEN ANCHOR" METHOD (Most compatible)
-        const mailtoLink = document.createElement('a');
-        mailtoLink.href = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        // This makes the browser treat it as a real link click
-        document.body.appendChild(mailtoLink);
-        mailtoLink.click();
-        document.body.removeChild(mailtoLink);
+        // 3. TRIGGER SYSTEM MAIL APP
+        const mailAnchor = document.createElement('a');
+        mailAnchor.href = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        document.body.appendChild(mailAnchor);
+        mailAnchor.click();
+        document.body.removeChild(mailAnchor);
 
-        alert("Success! Link copied to clipboard and Gmail drafted.");
+        // 4. CONFIRMATION
+        alert("✅ Success!\n\n1. Authorization link copied to clipboard.\n2. Email draft opened in your default mail app.");
         
     } catch (err) {
-        console.error("Critical Error in generateCertifiedLink:", err);
-        alert("Error generating link. Check console for details.");
+        console.error("Link Generation Error:", err);
+        alert("❌ Error: Could not generate link. Check the console for details.");
     }
 }
         async function submitToFormspree() {
