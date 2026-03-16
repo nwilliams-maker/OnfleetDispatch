@@ -62,14 +62,19 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start border-t border-slate-100 pt-10">
                     <div class="space-y-6">
                         <div class="flex justify-between items-end mb-2">
-    <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">
-        Job Locations 
-        <span id="location_count_badge" class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full hidden">0 Locations</span>
-    </label>
-    <button type="button" id="syncBtn" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
-        🔄 Sync Nearby Onfleet Tasks
-    </button>
-</div>
+                            <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">
+                                Task Locations 
+                                <span id="location_count_badge" class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full hidden">0 Locations | 0 Total Tasks</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="confirmClearList()" class="bg-red-50 text-red-600 text-[9px] font-black px-2 py-1 rounded uppercase hover:bg-red-100 transition-all">
+                                    🗑️ Clear List
+                                </button>
+                                <button type="button" id="syncBtn" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
+                                    🔄 Sync Nearby Onfleet Tasks
+                                </button>
+                            </div>
+                        </div>
                         <textarea id="locations" rows="10" class="font-mono text-xs" placeholder="Paste stops here..." oninput="calculateLargeRoute()"></textarea>
                         
                         <div class="bg-slate-900 rounded-3xl p-8 text-white flex justify-between items-center shadow-2xl relative">
@@ -150,51 +155,58 @@
         }
 
         async function fetchOnfleetTasks() {
-    const homeAddress = document.getElementById('ic_address').value;
-    if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
+            const homeAddress = document.getElementById('ic_address').value;
+            if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
 
-    const loader = document.getElementById('loaderOverlay');
-    const syncBtn = document.getElementById('syncBtn');
-    const badge = document.getElementById('location_count_badge'); // New reference
-    
-    loader.classList.remove('hidden'); loader.classList.add('flex');
-    syncBtn.innerText = "⏳ Counting Jobs...";
-    syncBtn.disabled = true;
-
-    try {
-        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-        const addressData = await response.json();
-
-        if (addressData.error) throw new Error(addressData.error);
-
-        const addresses = Object.keys(addressData);
-
-        if (addresses.length === 0) {
-            alert("No unassigned tasks found within 40 miles.");
-            document.getElementById('locations').value = "";
-            badge.classList.add('hidden'); // Hide if empty
-        } else {
-            const formattedList = addresses.map(addr => {
-                const count = addressData[addr];
-                return count > 1 ? `${addr} (${count} Jobs)` : addr;
-            });
-            document.getElementById('locations').value = formattedList.join('\n');
+            const loader = document.getElementById('loaderOverlay');
+            const syncBtn = document.getElementById('syncBtn');
+            const badge = document.getElementById('location_count_badge');
             
-            // --- UPDATE THE BADGE ---
-            badge.innerText = `${addresses.length} Locations`;
-            badge.classList.remove('hidden');
-            
-            calculateLargeRoute();
-            alert(`Success! Found ${addresses.length} unique locations within 40 miles.`);
+            loader.classList.remove('hidden'); loader.classList.add('flex');
+            syncBtn.innerText = "⏳ Counting Tasks...";
+            syncBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+                const addressData = await response.json();
+
+                if (addressData.error) throw new Error(addressData.error);
+
+                const addresses = Object.keys(addressData);
+
+                if (addresses.length === 0) {
+                    alert("No unassigned tasks found within 40 miles.");
+                    document.getElementById('locations').value = "";
+                    badge.classList.add('hidden');
+                } else {
+                    const totalTasks = Object.values(addressData).reduce((a, b) => a + b, 0);
+                    const formattedList = addresses.map(addr => {
+                        const count = addressData[addr];
+                        return count > 1 ? `${addr} (${count} Tasks)` : addr;
+                    });
+                    document.getElementById('locations').value = formattedList.join('\n');
+                    
+                    badge.innerText = `${addresses.length} Locations | ${totalTasks} Total Tasks`;
+                    badge.classList.remove('hidden');
+                    
+                    calculateLargeRoute();
+                    alert(`Success! Found ${addresses.length} unique locations with ${totalTasks} total tasks.`);
+                }
+            } catch (error) {
+                alert("Sync Error: " + error.message);
+            } finally {
+                loader.classList.add('hidden');
+                syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
+                syncBtn.disabled = false;
+            }
         }
-    } catch (error) {
-        alert("Sync Error: " + error.message);
-    } finally {
-        loader.classList.add('hidden');
-        syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
-        syncBtn.disabled = false;
-    }
-}
+
+        function confirmClearList() {
+            if (confirm("Are you sure you want to clear all locations?")) {
+                document.getElementById('locations').value = '';
+                calculateLargeRoute();
+            }
+        }
 
         function handleManualEdit() {
             const btn = document.getElementById('saveBtn');
@@ -233,40 +245,59 @@
         }
 
         function calculateLargeRoute() {
-    clearTimeout(inputTimer);
-    const loader = document.getElementById('loaderOverlay');
-    const home = document.getElementById('ic_address').value.trim();
-    const rawStops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
-    
-    // 1. STRIP THE BADGE FOR GOOGLE MAPS
-    const cleanStops = rawStops.map(s => s.replace(/\s\(\d+\sJobs\)$/, "").trim());
+            clearTimeout(inputTimer);
+            const loader = document.getElementById('loaderOverlay');
+            const mileageDisplay = document.getElementById('mileage_display');
+            const timeDisplay = document.getElementById('time_display');
+            const badge = document.getElementById('location_count_badge');
+            
+            const home = document.getElementById('ic_address').value.trim();
+            const textArea = document.getElementById('locations');
+            const rawStops = textArea.value.split('\n').filter(l => l.trim().length > 5);
 
-    inputTimer = setTimeout(() => {
-        if (cleanStops.length === 0 || !home) return; // Use cleanStops here
-        loader.classList.remove('hidden'); loader.classList.add('flex');
-        
-        directionsService.route({
-            origin: home, 
-            destination: home,
-            waypoints: cleanStops.map(l => ({location: l, stopover: true})), // Use cleanStops here
-            optimizeWaypoints: true, 
-            travelMode: google.maps.TravelMode.DRIVING
-        }, (result, status) => {
-            if (status === 'OK') {
-                directionsRenderer.setDirections(result);
-                let m = 0, s = 0;
-                result.routes[0].legs.forEach(leg => { m += leg.distance.value; s += leg.duration.value; });
-                document.getElementById('mileage_display').innerText = (m * 0.000621371).toFixed(1);
-                const hrs = Math.floor(s/3600), mins = Math.floor((s%3600)/60);
-                document.getElementById('time_display').innerText = hrs > 0 ? hrs+"h "+mins+"m" : mins+"m";
-                
-                // 2. IMPORTANT: Keep the optimized sequence clean for the URL generator
-                window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => cleanStops[i]), home];
+            // RESET LOGIC: If box is empty, clear everything immediately
+            if (rawStops.length === 0) {
+                mileageDisplay.innerText = "0.0";
+                timeDisplay.innerText = "--";
+                if (badge) badge.classList.add('hidden');
+                if (directionsRenderer) directionsRenderer.setDirections({routes: []});
+                window.optimizedSequence = [];
+                return;
             }
-            loader.classList.add('hidden');
-        });
-    }, 800);
-}
+
+            inputTimer = setTimeout(() => {
+                if (!home) return;
+                loader.classList.remove('hidden'); loader.classList.add('flex');
+                
+                // Clean stops: Remove "(X Tasks)" suffix for Google Maps
+                const stops = rawStops.map(s => s.replace(/\s\(\d+\sTasks\)$/, "").trim());
+
+                directionsService.route({
+                    origin: home, 
+                    destination: home,
+                    waypoints: stops.map(l => ({location: l, stopover: true})),
+                    optimizeWaypoints: true, 
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, (result, status) => {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                        let m = 0, s = 0;
+                        result.routes[0].legs.forEach(leg => { m += leg.distance.value; s += leg.duration.value; });
+                        
+                        mileageDisplay.innerText = (m * 0.000621371).toFixed(1);
+                        const hrs = Math.floor(s/3600), mins = Math.floor((s%3600)/60);
+                        timeDisplay.innerText = hrs > 0 ? hrs+"h "+mins+"m" : mins+"m";
+                        
+                        window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
+                    } else {
+                        mileageDisplay.innerText = "0.0";
+                        timeDisplay.innerText = "--";
+                    }
+                    loader.classList.add('hidden');
+                });
+            }, 800);
+        }
+
         function toggleDecisionView() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
             const block = document.getElementById('reason_block');
@@ -307,71 +338,68 @@
         }
 
         function generateCertifiedLink() {
-    try {
-        const rawDate = document.getElementById('due_date').value;
-        let displayDate = 'N/A';
-        if (rawDate) {
-            const p = rawDate.split('-');
-            displayDate = `${p[1]}/${p[2]}/${p[0]}`;
+            try {
+                const rawDate = document.getElementById('due_date').value;
+                let displayDate = 'N/A';
+                if (rawDate) {
+                    const p = rawDate.split('-');
+                    displayDate = `${p[1]}/${p[2]}/${p[0]}`;
+                }
+
+                const d = {
+                    icn: document.getElementById('ic_name_setup').value,
+                    ice: document.getElementById('ic_email_setup').value,
+                    wo: document.getElementById('task_num').value,
+                    due: rawDate,
+                    comp: document.getElementById('comp').value,
+                    mi: document.getElementById('mileage_display').innerText,
+                    time: document.getElementById('time_display').innerText,
+                    locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
+                };
+                
+                if (!d.ice || d.mi === "0.0") {
+                    alert("⚠️ Missing Data: Please ensure the Contractor Email and Route are populated.");
+                    return;
+                }
+                
+                const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+                const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
+                
+                const tempInput = document.createElement('textarea');
+                tempInput.value = link;
+                tempInput.style.position = 'fixed';
+                tempInput.style.left = '-9999px';
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+
+                const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
+                const body = `Dear ${d.icn},\n\n` +
+                             `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
+                             `ROUTE DETAILS:\n` +
+                             `• Work Order: #${d.wo}\n` +
+                             `• Due Date: ${displayDate}\n` +
+                             `• Compensation: $${d.comp}\n` +
+                             `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
+                             `Please click the link below to authorize the route and compensation.\n\n` +
+                             `REVIEW LINK:\n${link}\n\n` +
+                             `Regards,\nTerraboost Media Dispatch`;
+
+                const mailAnchor = document.createElement('a');
+                mailAnchor.href = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                document.body.appendChild(mailAnchor);
+                mailAnchor.click();
+                document.body.removeChild(mailAnchor);
+
+                alert("✅ Success!\n\n1. Authorization link copied to clipboard.\n2. Email draft opened in your default mail app.");
+                
+            } catch (err) {
+                console.error("Link Generation Error:", err);
+                alert("❌ Error: Could not generate link.");
+            }
         }
 
-        const d = {
-            icn: document.getElementById('ic_name_setup').value,
-            ice: document.getElementById('ic_email_setup').value,
-            wo: document.getElementById('task_num').value,
-            due: rawDate,
-            comp: document.getElementById('comp').value,
-            mi: document.getElementById('mileage_display').innerText,
-            time: document.getElementById('time_display').innerText,
-            locs: window.optimizedSequence ? window.optimizedSequence.join('|') : ""
-        };
-        
-        if (!d.ice || d.mi === "0.0") {
-            alert("⚠️ Missing Data: Please ensure the Contractor Email and Route are populated.");
-            return;
-        }
-        
-        // Create the encoded link
-        const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
-        const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
-        
-        // 1. CLIPBOARD COPY (Synchronous & Reliable)
-        const tempInput = document.createElement('textarea');
-        tempInput.value = link;
-        tempInput.style.position = 'fixed';
-        tempInput.style.left = '-9999px';
-        document.body.appendChild(tempInput);
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-
-        // 2. CONSTRUCT MAILTO
-        const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
-        const body = `Dear ${d.icn},\n\n` +
-                     `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
-                     `ROUTE DETAILS:\n` +
-                     `• Work Order: #${d.wo}\n` +
-                     `• Due Date: ${displayDate}\n` +
-                     `• Compensation: $${d.comp}\n` +
-                     `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
-                     `REVIEW LINK:\n${link}\n\n` +
-                     `Regards,\nTerraboost Media Dispatch`;
-
-        // 3. TRIGGER SYSTEM MAIL APP
-        const mailAnchor = document.createElement('a');
-        mailAnchor.href = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        document.body.appendChild(mailAnchor);
-        mailAnchor.click();
-        document.body.removeChild(mailAnchor);
-
-        // 4. CONFIRMATION
-        alert("✅ Success!\n\n1. Authorization link copied to clipboard.\n2. Email draft opened in your default mail app. IF Email does not open then there is an Error: Possible Fix, make sure that Default Mailto App is selected as Outlook/Gmail in your PC's settings -if it is Chrome, the email will not open- ");
-        
-    } catch (err) {
-        console.error("Link Generation Error:", err);
-        alert("❌ Error: Could not generate link. Check the console for details. Possible Fix, make sure that Default Mailto App is selected as Outlook/Gmail -if it is Chrome, the email will not open- ");
-    }
-}
         async function submitToFormspree() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
             const sig = document.getElementById('typed_sig').value;
@@ -407,6 +435,14 @@
             document.getElementById('locations').value = "";
             document.getElementById('mileage_display').innerText = "0.0";
             document.getElementById('time_display').innerText = "--";
+            document.getElementById('comp').placeholder = "0.00";
+
+            const badge = document.getElementById('location_count_badge');
+            if (badge) {
+                badge.innerText = "0 Locations | 0 Total Tasks";
+                badge.classList.add('hidden');
+            }
+
             if (directionsRenderer) directionsRenderer.setDirections({routes: []});
         }
 
