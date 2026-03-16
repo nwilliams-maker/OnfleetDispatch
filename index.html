@@ -61,11 +61,15 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start border-t border-slate-100 pt-10">
                     <div class="space-y-6">
-                        <div class="flex justify-between items-end mb-2">
-                            <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">
-                                Task Locations 
-                                <span id="location_count_badge" class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full hidden">0 Locations | 0 Total Tasks</span>
-                            </label>
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">
+                                    Task Locations
+                                </label>
+                                <span id="location_count_badge" class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[9px] font-bold hidden w-fit">
+                                    0 Locations | 0 Total Tasks
+                                </span>
+                            </div>
                             <div class="flex gap-2">
                                 <button type="button" onclick="confirmClearList()" class="bg-red-50 text-red-600 text-[9px] font-black px-2 py-1 rounded uppercase hover:bg-red-100 transition-all">
                                     🗑️ Clear List
@@ -250,15 +254,16 @@
             const mileageDisplay = document.getElementById('mileage_display');
             const timeDisplay = document.getElementById('time_display');
             const badge = document.getElementById('location_count_badge');
+            const compInput = document.getElementById('comp');
             
             const home = document.getElementById('ic_address').value.trim();
             const textArea = document.getElementById('locations');
             const rawStops = textArea.value.split('\n').filter(l => l.trim().length > 5);
 
-            // RESET LOGIC: If box is empty, clear everything immediately
             if (rawStops.length === 0) {
                 mileageDisplay.innerText = "0.0";
                 timeDisplay.innerText = "--";
+                compInput.placeholder = "0.00";
                 if (badge) badge.classList.add('hidden');
                 if (directionsRenderer) directionsRenderer.setDirections({routes: []});
                 window.optimizedSequence = [];
@@ -269,7 +274,6 @@
                 if (!home) return;
                 loader.classList.remove('hidden'); loader.classList.add('flex');
                 
-                // Clean stops: Remove "(X Tasks)" suffix for Google Maps
                 const stops = rawStops.map(s => s.replace(/\s\(\d+\sTasks\)$/, "").trim());
 
                 directionsService.route({
@@ -281,13 +285,22 @@
                 }, (result, status) => {
                     if (status === 'OK') {
                         directionsRenderer.setDirections(result);
-                        let m = 0, s = 0;
-                        result.routes[0].legs.forEach(leg => { m += leg.distance.value; s += leg.duration.value; });
+                        let totalMeters = 0;
+                        let totalSeconds = 0;
+                        result.routes[0].legs.forEach(leg => { 
+                            totalMeters += leg.distance.value; 
+                            totalSeconds += leg.duration.value; 
+                        });
+
+                        mileageDisplay.innerText = (totalMeters * 0.000621371).toFixed(1);
+                        const hrs = Math.floor(totalSeconds / 3600);
+                        const mins = Math.floor((totalSeconds % 3600) / 60);
+                        timeDisplay.innerText = hrs > 0 ? hrs + "h " + mins + "m" : mins + "m";
                         
-                        mileageDisplay.innerText = (m * 0.000621371).toFixed(1);
-                        const hrs = Math.floor(s/3600), mins = Math.floor((s%3600)/60);
-                        timeDisplay.innerText = hrs > 0 ? hrs+"h "+mins+"m" : mins+"m";
-                        
+                        // Compensation suggestion based on driving time @ $30/hr
+                        const suggestedPay = ((totalSeconds / 3600) * 30).toFixed(2);
+                        compInput.placeholder = `Sug: $${suggestedPay}`;
+
                         window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
                     } else {
                         mileageDisplay.innerText = "0.0";
