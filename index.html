@@ -320,15 +320,7 @@
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
     const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
     
-    // 1. FORCED CLIPBOARD COPY (Always works)
-    const tempInput = document.createElement('textarea');
-    tempInput.value = link;
-    document.body.appendChild(tempInput);
-    tempInput.select();
-    document.execCommand('copy');
-    document.body.removeChild(tempInput);
-
-    // 2. Setup Email Parts
+    // 1. Setup Email Content
     const subject = `Action Required: Terraboost Route Request | WO #${d.wo}`;
     const body = `Dear ${d.icn},\n\n` +
                  `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
@@ -340,22 +332,25 @@
                  `REVIEW LINK:\n${link}\n\n` +
                  `Regards,\nTerraboost Media Dispatch`;
 
-    // 3. LENGTH CHECK & TRIGGER
-    const mailtoUrl = `mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    // 2. TRIGGER EMAIL POPUP IMMEDIATELY
+    // This MUST be the first major action to satisfy browser security
+    window.open(`mailto:${d.ice}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self');
 
-    if (mailtoUrl.length > 1900) {
-        // FALLBACK: If the URL is too long, open a blank Gmail/Email window
-        alert("Route is large! Link copied to clipboard. Opening email... please PASTE (Ctrl+V) the link into the body.");
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${d.ice}&su=${encodeURIComponent(subject)}`, '_blank');
-    } else {
-        // STANDARD: Create link and click
-        const mailLink = document.createElement('a');
-        mailLink.href = mailtoUrl;
-        document.body.appendChild(mailLink);
-        mailLink.click();
-        document.body.removeChild(mailLink);
-        alert("Authorization Link Copied & Email Drafted!");
+    // 3. COPY TO CLIPBOARD (Background fallback)
+    const tempInput = document.createElement('textarea');
+    tempInput.value = link;
+    tempInput.style.position = 'fixed'; // Avoid scrolling to bottom
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    try {
+        document.execCommand('copy');
+    } catch (err) {
+        console.error('Clipboard failed', err);
     }
+    document.body.removeChild(tempInput);
+
+    // 4. Alert the user (After the popup has been triggered)
+    console.log("Authorization Link Generated: " + link);
 }
         async function submitToFormspree() {
             const decision = document.querySelector('input[name="ic_decision"]:checked').value;
