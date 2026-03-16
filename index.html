@@ -62,11 +62,14 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start border-t border-slate-100 pt-10">
                     <div class="space-y-6">
                         <div class="flex justify-between items-end mb-2">
-                            <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">Job Locations</label>
-                            <button type="button" id="syncBtn" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
-                                🔄 Sync Nearby Onfleet Tasks
-                            </button>
-                        </div>
+    <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">
+        Job Locations 
+        <span id="location_count_badge" class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full hidden">0 Locations</span>
+    </label>
+    <button type="button" id="syncBtn" onclick="fetchOnfleetTasks()" class="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded uppercase hover:bg-blue-700 transition-all">
+        🔄 Sync Nearby Onfleet Tasks
+    </button>
+</div>
                         <textarea id="locations" rows="10" class="font-mono text-xs" placeholder="Paste stops here..." oninput="calculateLargeRoute()"></textarea>
                         
                         <div class="bg-slate-900 rounded-3xl p-8 text-white flex justify-between items-center shadow-2xl relative">
@@ -147,44 +150,51 @@
         }
 
         async function fetchOnfleetTasks() {
-            const homeAddress = document.getElementById('ic_address').value;
-            if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
+    const homeAddress = document.getElementById('ic_address').value;
+    if (!homeAddress) return alert("Please lookup a contractor first to get their home address.");
 
-            const loader = document.getElementById('loaderOverlay');
-            const syncBtn = document.getElementById('syncBtn');
+    const loader = document.getElementById('loaderOverlay');
+    const syncBtn = document.getElementById('syncBtn');
+    const badge = document.getElementById('location_count_badge'); // New reference
+    
+    loader.classList.remove('hidden'); loader.classList.add('flex');
+    syncBtn.innerText = "⏳ Counting Jobs...";
+    syncBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+        const addressData = await response.json();
+
+        if (addressData.error) throw new Error(addressData.error);
+
+        const addresses = Object.keys(addressData);
+
+        if (addresses.length === 0) {
+            alert("No unassigned tasks found within 40 miles.");
+            document.getElementById('locations').value = "";
+            badge.classList.add('hidden'); // Hide if empty
+        } else {
+            const formattedList = addresses.map(addr => {
+                const count = addressData[addr];
+                return count > 1 ? `${addr} (${count} Jobs)` : addr;
+            });
+            document.getElementById('locations').value = formattedList.join('\n');
             
-            loader.classList.remove('hidden'); loader.classList.add('flex');
-            syncBtn.innerText = "⏳ Counting Jobs...";
-            syncBtn.disabled = true;
-
-            try {
-                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-                const addressData = await response.json();
-
-                if (addressData.error) throw new Error(addressData.error);
-
-                const addresses = Object.keys(addressData);
-
-                if (addresses.length === 0) {
-                    alert("No unassigned tasks found within 40 miles.");
-                    document.getElementById('locations').value = "";
-                } else {
-                    const formattedList = addresses.map(addr => {
-                        const count = addressData[addr];
-                        return count > 1 ? `${addr} (${count} Jobs)` : addr;
-                    });
-                    document.getElementById('locations').value = formattedList.join('\n');
-                    calculateLargeRoute();
-                    alert(`Success! Found ${addresses.length} unique locations within 40 miles.`);
-                }
-            } catch (error) {
-                alert("Sync Error: " + error.message);
-            } finally {
-                loader.classList.add('hidden');
-                syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
-                syncBtn.disabled = false;
-            }
+            // --- UPDATE THE BADGE ---
+            badge.innerText = `${addresses.length} Locations`;
+            badge.classList.remove('hidden');
+            
+            calculateLargeRoute();
+            alert(`Success! Found ${addresses.length} unique locations within 40 miles.`);
         }
+    } catch (error) {
+        alert("Sync Error: " + error.message);
+    } finally {
+        loader.classList.add('hidden');
+        syncBtn.innerText = "🔄 Sync Nearby Onfleet Tasks";
+        syncBtn.disabled = false;
+    }
+}
 
         function handleManualEdit() {
             const btn = document.getElementById('saveBtn');
