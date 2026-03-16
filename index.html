@@ -136,8 +136,7 @@
 
     <script>
         let map, directionsService, directionsRenderer, inputTimer;
-        // UPDATE THIS URL AFTER YOUR NEW DEPLOYMENT
-        const webAppUrl = "https://script.google.com/macros/s/AKfycbwBdijlZOvbmP4lA_GYvtckedruXdHfhx1qCDMFXbCOjA6Qiv5gax_FY69Kp6ujpsjYHA/exec"; 
+        const webAppUrl = "https://script.google.com/macros/s/AKfycby0ksbaRk8DV2nNkMs6pTI_4NGsR7GQjBxzD7l_m6pF5rvK6FVVd5HKnvNxcSBCHVFJ/exec"; 
         const formspreeUrl = "https://formspree.io/f/meerlqll"; 
 
         function initMap() {
@@ -167,7 +166,7 @@
                 const addresses = Object.keys(addressData);
 
                 if (addresses.length === 0) {
-                    alert("No unassigned tasks found within 30 miles.");
+                    alert("No unassigned tasks found within 40 miles.");
                     document.getElementById('locations').value = "";
                 } else {
                     const formattedList = addresses.map(addr => {
@@ -176,7 +175,7 @@
                     });
                     document.getElementById('locations').value = formattedList.join('\n');
                     calculateLargeRoute();
-                    alert(`Success! Found ${addresses.length} unique locations.`);
+                    alert(`Success! Found ${addresses.length} unique locations within 40 miles.`);
                 }
             } catch (error) {
                 alert("Sync Error: " + error.message);
@@ -229,7 +228,6 @@
             const home = document.getElementById('ic_address').value.trim();
             const rawStops = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5);
             
-            // Clean stops for Google Maps (strip the Jobs count badge)
             const stops = rawStops.map(s => s.replace(/\s\(\d+\sJobs\)$/, "").trim());
 
             inputTimer = setTimeout(() => {
@@ -316,24 +314,25 @@
             
             const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
             const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
-            navigator.clipboard.writeText(link);
+            
+            navigator.clipboard.writeText(link).then(() => {
+                const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
+                const body = encodeURIComponent(
+                    `Dear ${d.icn},\n\n` +
+                    `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
+                    `ROUTE DETAILS:\n` +
+                    `• Work Order: #${d.wo}\n` +
+                    `• Due Date: ${displayDate}\n` +
+                    `• Compensation: $${d.comp}\n` +
+                    `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
+                    `Please click the link below to authorize the route and compensation.\n\n` +
+                    `REVIEW LINK:\n${link}\n\n` +
+                    `Regards,\nTerraboost Media Dispatch`
+                );
 
-            const subject = encodeURIComponent(`Action Required: Terraboost Route Request | WO #${d.wo}`);
-            const body = encodeURIComponent(
-                `Dear ${d.icn},\n\n` +
-                `An optimized route for WO #${d.wo} is ready for your review.\n\n` +
-                `ROUTE DETAILS:\n` +
-                `• Work Order: #${d.wo}\n` +
-                `• Due Date: ${displayDate}\n` +
-                `• Compensation: $${d.comp}\n` +
-                `• Round-Trip Mileage: ${d.mi} Miles\n\n` +
-                `Please click the link below to authorize the route and compensation.\n\n` +
-                `REVIEW LINK:\n${link}\n\n` +
-                `Regards,\nTerraboost Media Dispatch`
-            );
-
-            window.location.href = `mailto:${d.ice}?subject=${subject}&body=${body}`;
-            alert("Authorization Link Copied!");
+                window.location.href = `mailto:${d.ice}?subject=${subject}&body=${body}`;
+                alert("Authorization Link Copied & Email Drafted!");
+            });
         }
 
         async function submitToFormspree() {
