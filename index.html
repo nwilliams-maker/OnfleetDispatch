@@ -279,7 +279,7 @@
                 const s = `Action Required: Terraboost Route Request | WO #${d.wo}`;
                 const b = `Dear ${d.icn},\n\nRoute Summary:\n- Locations: ${d.lCnt}\n- Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Mileage: ${d.mi} Miles\n- Compensation: $${d.comp}\n\nReview Link: ${link}`;
                 window.open(`mailto:${d.ice}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`);
-                alert("Authorization link generated. If your email application does not open, go to the PC's settings > Default Apps > Mail to > Select Outlook > Set Default. Retry the Link");
+                alert("Authorization link generated. If your email application does not open, go to the PC's settings > Default Apps > Mail to > Select Outlook > Set Default. NOW Click the 'Send to IC' button");
             } catch (err) { alert("Error generating link."); }
         }
 
