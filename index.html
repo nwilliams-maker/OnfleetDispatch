@@ -181,37 +181,53 @@
         }
 
         async function fetchOnfleetTasks() {
-            const homeAddress = document.getElementById('ic_address').value;
-            if (!homeAddress) return alert("Please lookup a contractor first.");
-            const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
-            loader.classList.remove('hidden'); loader.classList.add('flex');
-            syncBtn.disabled = true;
-            try {
-                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-                const addressData = await response.json();
-                const addresses = Object.keys(addressData);
-                if (addresses.length === 0) {
-                    alert("No unassigned tasks found.");
-                    updateBadges(0, 0, 0);
-                } else {
-                    let totalTasks = 0, kioskInstalls = 0;
-                    const formattedList = addresses.map(addr => {
-                        const data = addressData[addr];
-                        const count = typeof data === 'object' ? data.count : data;
-                        const kCount = typeof data === 'object' ? data.kioskCount || 0 : 0;
-                        totalTasks += count; kioskInstalls += kCount;
-                        let entry = addr;
-                        if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
-                        if (count > 1) entry += ` (${count} Tasks)`;
-                        return entry;
-                    });
-                    document.getElementById('locations').value = formattedList.join('\n');
-                    updateBadges(addresses.length, totalTasks, kioskInstalls);
-                    calculateLargeRoute();
-                }
-            } catch (error) { alert("Sync Error: " + error.message); }
-            finally { loader.classList.add('hidden'); syncBtn.disabled = false; }
+    const homeAddress = document.getElementById('ic_address').value;
+    if (!homeAddress) return alert("Please lookup a contractor first.");
+    const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
+    loader.classList.remove('hidden'); loader.classList.add('flex');
+    syncBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+        const addressData = await response.json();
+        
+        // The keys of addressData represent UNIQUE locations
+        const addresses = Object.keys(addressData);
+        
+        if (addresses.length === 0) {
+            alert("No unassigned tasks found within 40 miles.");
+            updateBadges(0, 0, 0);
+        } else {
+            let totalTasksGlobal = 0, kioskInstallsGlobal = 0;
+            
+            const formattedList = addresses.map(addr => {
+                const data = addressData[addr];
+                const count = data.count || 0;
+                const kCount = data.kioskCount || 0;
+                
+                totalTasksGlobal += count; 
+                kioskInstallsGlobal += kCount;
+                
+                let entry = addr;
+                // Add labels per unique address
+                if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
+                if (count > 1) entry += ` (${count} Total Tasks)`;
+                return entry;
+            });
+            
+            document.getElementById('locations').value = formattedList.join('\n');
+            
+            // updateBadges(Unique Addresses, Total Tasks across all addresses, Total Kiosks)
+            updateBadges(addresses.length, totalTasksGlobal, kioskInstallsGlobal);
+            calculateLargeRoute();
         }
+    } catch (error) { 
+        alert("Sync Error: " + error.message); 
+    } finally { 
+        loader.classList.add('hidden'); 
+        syncBtn.disabled = false; 
+    }
+}
 
         function updateBadges(locCount, taskCount, kioskCount) {
             currentLocCount = locCount; currentTaskCount = taskCount; currentKioskCount = kioskCount;
