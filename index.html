@@ -181,53 +181,38 @@
         }
 
         async function fetchOnfleetTasks() {
-    const homeAddress = document.getElementById('ic_address').value;
-    if (!homeAddress) return alert("Please lookup a contractor first.");
-    const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
-    loader.classList.remove('hidden'); loader.classList.add('flex');
-    syncBtn.disabled = true;
-    
-    try {
-        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-        const addressData = await response.json();
-        
-        // The keys of addressData represent UNIQUE locations
-        const addresses = Object.keys(addressData);
-        
-        if (addresses.length === 0) {
-            alert("No unassigned tasks found within 40 miles.");
-            updateBadges(0, 0, 0);
-        } else {
-            let totalTasksGlobal = 0, kioskInstallsGlobal = 0;
-            
-            const formattedList = addresses.map(addr => {
-                const data = addressData[addr];
-                const count = data.count || 0;
-                const kCount = data.kioskCount || 0;
-                
-                totalTasksGlobal += count; 
-                kioskInstallsGlobal += kCount;
-                
-                let entry = addr;
-                // Add labels per unique address
-                if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
-                if (count > 1) entry += ` (${count} Total Tasks)`;
-                return entry;
-            });
-            
-            document.getElementById('locations').value = formattedList.join('\n');
-            
-            // updateBadges(Unique Addresses, Total Tasks across all addresses, Total Kiosks)
-            updateBadges(addresses.length, totalTasksGlobal, kioskInstallsGlobal);
-            calculateLargeRoute();
+            const homeAddress = document.getElementById('ic_address').value;
+            if (!homeAddress) return alert("Please lookup a contractor first.");
+            const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
+            loader.classList.remove('hidden'); loader.classList.add('flex');
+            syncBtn.disabled = true;
+            try {
+                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+                const addressData = await response.json();
+                const addresses = Object.keys(addressData);
+                if (addresses.length === 0) {
+                    alert("No unassigned tasks found.");
+                    updateBadges(0, 0, 0);
+                } else {
+                    let totalTasks = 0, kioskInstalls = 0;
+                    const formattedList = addresses.map(addr => {
+                        const data = addressData[addr];
+                        const count = data.count || 0;
+                        const kCount = data.kioskCount || 0;
+                        totalTasks += count; kioskInstalls += kCount;
+                        
+                        // STRICT FORMAT: Address (X Total Tasks) [X Kiosk Install]
+                        let entry = addr + ` (${count} Total Tasks)`;
+                        if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
+                        return entry;
+                    });
+                    document.getElementById('locations').value = formattedList.join('\n');
+                    updateBadges(addresses.length, totalTasks, kioskInstalls);
+                    calculateLargeRoute();
+                }
+            } catch (error) { alert("Sync Error: " + error.message); }
+            finally { loader.classList.add('hidden'); syncBtn.disabled = false; }
         }
-    } catch (error) { 
-        alert("Sync Error: " + error.message); 
-    } finally { 
-        loader.classList.add('hidden'); 
-        syncBtn.disabled = false; 
-    }
-}
 
         function updateBadges(locCount, taskCount, kioskCount) {
             currentLocCount = locCount; currentTaskCount = taskCount; currentKioskCount = kioskCount;
@@ -251,7 +236,8 @@
             if (lines.length > 0) {
                 let t = 0, k = 0;
                 lines.forEach(line => {
-                    const tMatch = line.match(/\((\d+)\sTasks\)/), kMatch = line.match(/\[(\d+)\sKiosk/);
+                    const tMatch = line.match(/\((\d+)\sTotal\sTasks\)/);
+                    const kMatch = line.match(/\[(\d+)\sKiosk/);
                     t += tMatch ? parseInt(tMatch[1]) : 1;
                     k += kMatch ? parseInt(kMatch[1]) : (line.toLowerCase().includes('kiosk install') ? 1 : 0);
                 });
@@ -295,7 +281,7 @@
                 const s = `Action Required: Terraboost Route Request | WO #${d.wo}`;
                 const b = `Dear ${d.icn},\n\nRoute Summary:\n- Locations: ${d.lCnt}\n- Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Mileage: ${d.mi} Miles\n- Compensation: $${d.comp}\n\nReview Link: ${link}`;
                 window.open(`mailto:${d.ice}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`);
-                alert("Authorization link generated. If your email application does not open, go to the PC's settings > Default Apps > Mail to > Select Outlook > Set Default. NOW Click the 'Send to IC' button");
+                alert("Authorization link generated.");
             } catch (err) { alert("Error generating link."); }
         }
 
@@ -390,7 +376,6 @@
             const btn = document.getElementById('submitBtn');
             btn.disabled = true; btn.innerText = "Sending...";
 
-            // MODIFIED: Format Locations excluding the first and last (Home Address)
             const sequenceArray = window.payloadData.locs ? window.payloadData.locs.split('|') : [];
             const jobListOnly = sequenceArray.length > 2 ? sequenceArray.slice(1, -1) : sequenceArray;
             const locationList = jobListOnly.map((loc, index) => `${index + 1}. ${loc}`).join('\n');
