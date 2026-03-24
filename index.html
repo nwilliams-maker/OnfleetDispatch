@@ -65,7 +65,7 @@
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-blue-600 font-black tracking-widest uppercase text-[10px] mb-0">Task Locations</label>
                                 <div class="flex flex-col gap-1">
-                                    <span id="location_count_badge" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold hidden w-fit">0 Locations | 0 Tasks</span>
+                                    <span id="location_count_badge" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold hidden w-fit">0 Locations | 0 Total Tasks</span>
                                     <span id="kiosk_count_badge" class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold hidden w-fit">0 Kiosk Installs</span>
                                 </div>
                             </div>
@@ -201,8 +201,8 @@
                         const kCount = data.kioskCount || 0;
                         totalTasks += count; kioskInstalls += kCount;
                         
-                        // STRICT FORMAT: Address (X Tasks) [X Kiosk Install]
-                        let entry = addr + ` (${count} Tasks)`;
+                        // Clean Label Construction
+                        let entry = addr + ` (${count} Total Tasks)`;
                         if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
                         return entry;
                     });
@@ -218,7 +218,7 @@
             currentLocCount = locCount; currentTaskCount = taskCount; currentKioskCount = kioskCount;
             const lBadge = document.getElementById('location_count_badge'), kBadge = document.getElementById('kiosk_count_badge');
             if (locCount > 0) {
-                lBadge.innerText = `${locCount} Locations | ${taskCount} Tasks`;
+                lBadge.innerText = `${locCount} Locations | ${taskCount} Total Tasks`;
                 lBadge.classList.remove('hidden');
             } else lBadge.classList.add('hidden');
             if (kioskCount > 0) {
@@ -236,7 +236,7 @@
             if (lines.length > 0) {
                 let t = 0, k = 0;
                 lines.forEach(line => {
-                    const tMatch = line.match(/\((\d+)\sTasks\)/);
+                    const tMatch = line.match(/\((\d+)\sTotal\sTasks\)/);
                     const kMatch = line.match(/\[(\d+)\sKiosk/);
                     t += tMatch ? parseInt(tMatch[1]) : 1;
                     k += kMatch ? parseInt(kMatch[1]) : (line.toLowerCase().includes('kiosk install') ? 1 : 0);
@@ -306,7 +306,7 @@
                     <div class="flex justify-between text-blue-600 font-bold"><span>Work Order #:</span> <span>${d.wo}</span></div>
                     <div class="flex justify-between"><span>Due Date:</span> <span class="font-bold">${displayDate}</span></div>
                     <div class="flex justify-between"><span>Unique Locations:</span> <span class="font-bold">${d.lCnt}</span></div>
-                    <div class="flex justify-between"><span>Tasks:</span> <span class="font-bold">${d.tCnt}</span></div>
+                    <div class="flex justify-between"><span>Total Tasks:</span> <span class="font-bold">${d.tCnt}</span></div>
                     <div class="flex justify-between text-emerald-600 font-bold"><span>Kiosk Installs:</span> <span>${d.kCnt}</span></div>
                     <div class="flex justify-between"><span>Mileage:</span> <span>${d.mi} Miles</span></div>
                     <div class="flex justify-between border-t pt-2 mt-2 font-black text-xl text-emerald-600"><span>Total Comp:</span> <span>$${d.comp}</span></div>
