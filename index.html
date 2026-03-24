@@ -201,7 +201,7 @@
                         const kCount = data.kioskCount || 0;
                         totalTasks += count; kioskInstalls += kCount;
                         
-                        // Clean Label Construction
+                        // Strict format: Address (X Total Tasks) [X Kiosk Install]
                         let entry = addr + ` (${count} Total Tasks)`;
                         if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
                         return entry;
