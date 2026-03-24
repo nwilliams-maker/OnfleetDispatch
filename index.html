@@ -143,7 +143,7 @@
     <script>
         let map, directionsService, directionsRenderer, inputTimer;
         let currentLocCount = 0, currentTaskCount = 0, currentKioskCount = 0;
-        const webAppUrl = "https://script.google.com/macros/s/AKfycbwBdijlZOvbmP4lA_GYvtckedruXdHfhx1qCDMFXbCOjA6Qiv5gax_FY69Kp6ujpsjYHA/exec"; 
+        const webAppUrl = "YOUR_NEW_DEPLOYED_URL"; 
         const formspreeUrl = "https://formspree.io/f/meerlqll"; 
 
         function initMap() {
@@ -201,7 +201,7 @@
                         const kCount = data.kioskCount || 0;
                         totalTasks += count; kioskInstalls += kCount;
                         
-                        // Strict format: Address (X Total Tasks) [X Kiosk Install]
+                        // CONSTRUCTION: Address (X Total Tasks) [X Kiosk Install]
                         let entry = addr + ` (${count} Total Tasks)`;
                         if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
                         return entry;
