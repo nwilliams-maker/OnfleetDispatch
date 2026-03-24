@@ -242,43 +242,57 @@
             } else kBadge.classList.add('hidden');
         }
 
-        function calculateLargeRoute() {
-            clearTimeout(inputTimer);
-            const mileageDisplay = document.getElementById('mileage_display'), timeDisplay = document.getElementById('time_display'), compInput = document.getElementById('comp');
-            const home = document.getElementById('ic_address').value.trim(), textArea = document.getElementById('locations');
-            const lines = textArea.value.split('\n').filter(l => l.trim().length > 5);
+        // Replace ONLY the calculateLargeRoute function inside your script tag
+function calculateLargeRoute() {
+    clearTimeout(inputTimer);
+    const mileageDisplay = document.getElementById('mileage_display'), 
+          timeDisplay = document.getElementById('time_display'), 
+          compInput = document.getElementById('comp');
+    const home = document.getElementById('ic_address').value.trim(), 
+          textArea = document.getElementById('locations');
+    const lines = textArea.value.split('\n').filter(l => l.trim().length > 5);
+    
+    if (lines.length > 0) {
+        let t = 0, k = 0;
+        lines.forEach(line => {
+            // Regex to find (X Tasks)
+            const tMatch = line.match(/\((\d+)\sTasks\)/i);
+            // Regex to find [X Kiosk Install] - Targeting your specific phrase
+            const kMatch = line.match(/\[(\d+)\sKiosk\sInstall\]/i);
             
-            if (lines.length > 0) {
-                let t = 0, k = 0;
-                lines.forEach(line => {
-                    const tMatch = line.match(/\((\d+)\sTasks\)/), kMatch = line.match(/\[(\d+)\sKiosk/);
-                    t += tMatch ? parseInt(tMatch[1]) : 1;
-                    k += kMatch ? parseInt(kMatch[1]) : (line.toLowerCase().includes('kiosk install') ? 1 : 0);
-                });
-                updateBadges(lines.length, t, k);
-            } else updateBadges(0, 0, 0);
+            t += tMatch ? parseInt(tMatch[1]) : 1;
+            if (kMatch) {
+                k += parseInt(kMatch[1]);
+            } else if (line.toLowerCase().includes('kiosk install')) {
+                // Fallback if the count isn't in brackets but the text is there
+                k += 1;
+            }
+        });
+        updateBadges(lines.length, t, k);
+    } else updateBadges(0, 0, 0);
 
-            if (lines.length === 0) return;
-            inputTimer = setTimeout(() => {
-                if (!home) return;
-                const stops = lines.map(s => s.replace(/\s[\(\[].*$/, "").trim());
-                directionsService.route({
-                    origin: home, destination: home, waypoints: stops.map(l => ({location: l, stopover: true})),
-                    optimizeWaypoints: true, travelMode: google.maps.TravelMode.DRIVING
-                }, (result, status) => {
-                    if (status === 'OK') {
-                        directionsRenderer.setDirections(result);
-                        let totalMeters = 0, totalSeconds = 0;
-                        result.routes[0].legs.forEach(leg => { totalMeters += leg.distance.value; totalSeconds += leg.duration.value; });
-                        mileageDisplay.innerText = (totalMeters * 0.000621371).toFixed(1);
-                        const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60);
-                        timeDisplay.innerText = h > 0 ? h + "h " + m + "m" : m + "m";
-                        compInput.placeholder = `Sug: $${(totalSeconds / 3600 * 30).toFixed(2)}`;
-                        window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
-                    }
-                });
-            }, 800);
-        }
+    if (lines.length === 0) return;
+    inputTimer = setTimeout(() => {
+        if (!home) return;
+        const stops = lines.map(s => s.replace(/\s[\(\[].*$/, "").trim());
+        directionsService.route({
+            origin: home, destination: home, waypoints: stops.map(l => ({location: l, stopover: true})),
+            optimizeWaypoints: true, travelMode: google.maps.TravelMode.DRIVING
+        }, (result, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(result);
+                let totalMeters = 0, totalSeconds = 0;
+                result.routes[0].legs.forEach(leg => { totalMeters += leg.distance.value; totalSeconds += leg.duration.value; });
+                mileageDisplay.innerText = (totalMeters * 0.000621371).toFixed(1);
+                const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60);
+                timeDisplay.innerText = h > 0 ? h + "h " + m + "m" : m + "m";
+                compInput.placeholder = `Sug: $${(totalSeconds / 3600 * 30).toFixed(2)}`;
+                window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
+                window.rawJobList = lines; 
+            }
+        });
+    }, 800);
+}
 
         function generateCertifiedLink() {
             try {
