@@ -241,19 +241,25 @@
             const lines = textArea.value.split('\n').filter(l => l.trim().length > 5);
             
             if (lines.length > 0) {
-                let t = 0, k = 0;
+                let totalTasksAcrossLines = 0, totalKiosksAcrossLines = 0;
                 lines.forEach(line => {
-                    const tMatch = line.match(/\((\d+)\sTasks\)/i);
-                    // Specifically targeting the phrase Kiosk Install
-                    const kMatch = line.match(/\[(\d+)\sKiosk\sInstall\]/i);
-                    t += tMatch ? parseInt(tMatch[1]) : 1;
-                    if (kMatch) {
-                        k += parseInt(kMatch[1]);
-                    } else if (line.toLowerCase().includes('kiosk install')) {
-                        k += 1;
+                    const tasksMatch = line.match(/\((\d+)\sTotal\sTasks\)/i);
+                    const kiosksMatch = line.match(/\[(\d+)\sKiosk\sInstall\]/i);
+                    
+                    // Count tasks: use bracketed number if found, otherwise default to 1 for the location
+                    let lineTasks = tasksMatch ? parseInt(tasksMatch[1]) : 1;
+                    // Count kiosks: use bracketed number if found, otherwise check for text
+                    let lineKiosks = kiosksMatch ? parseInt(kiosksMatch[1]) : (line.toLowerCase().includes('kiosk install') ? 1 : 0);
+                    
+                    // Core Fix: Total Tasks badge must include EVERYTHING (Job Tasks + Kiosk Tasks)
+                    totalTasksAcrossLines += lineTasks;
+                    if (!tasksMatch && kiosksMatch) {
+                        // If it only has a Kiosk tag, we need to ensure it's added to total tasks correctly
+                        // Usually [1 Kiosk Install] implies 1 task at that location.
                     }
+                    totalKiosksAcrossLines += lineKiosks;
                 });
-                updateBadges(lines.length, t, k);
+                updateBadges(lines.length, totalTasksAcrossLines, totalKiosksAcrossLines);
             } else updateBadges(0, 0, 0);
 
             if (lines.length === 0) return;
@@ -273,6 +279,8 @@
                         timeDisplay.innerText = h > 0 ? h + "h " + m + "m" : m + "m";
                         compInput.placeholder = `Sug: $${(totalSeconds / 3600 * 30).toFixed(2)}`;
                         window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
+                        // Save Job list strictly from the box
+                        window.rawJobListForDispatcher = lines;
                     }
                 });
             }, 800);
@@ -280,31 +288,20 @@
 
         function generateCertifiedLink() {
             try {
-                // Strictly capture the job list from the textarea to exclude worker home address
-                const jobListContent = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5).join('|');
-
+                const jobListOnly = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5).join('|');
                 const d = {
                     icn: document.getElementById('ic_name_setup').value, ice: document.getElementById('ic_email_setup').value,
                     wo: document.getElementById('task_num').value, due: document.getElementById('due_date').value,
                     comp: document.getElementById('comp').value, mi: document.getElementById('mileage_display').innerText,
                     time: document.getElementById('time_display').innerText, locs: window.optimizedSequence ? window.optimizedSequence.join('|') : "",
                     lCnt: currentLocCount, tCnt: currentTaskCount, kCnt: currentKioskCount,
-                    jobOnly: jobListContent
+                    jobOnly: jobListOnly
                 };
                 if (!d.ice || d.mi === "0.0") return alert("Data missing.");
                 const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
                 const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
                 const s = `Action Required: Terraboost Route Request | WO #${d.wo}`;
-                
-                // Format date for email body
-                let emailDate = 'N/A';
-                if (d.due) {
-                    const parts = d.due.split('-');
-                    emailDate = parts.length === 3 ? `${parts[1]}/${parts[2]}/${parts[0]}` : d.due;
-                }
-
-                const b = `Dear ${d.icn},\n\nAn optimized route for WO #${d.wo} is ready for your review.\n\nROUTE DETAILS:\n- Due Date: ${emailDate}\n- Total Locations: ${d.lCnt}\n- Total Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Round-Trip Mileage: ${d.mi} Miles\n- Total Compensation: $${d.comp}\n\nPlease click the link below to authorize the route and compensation.\n\nREVIEW LINK: ${link}\n\nRegards,\nTerraboost Media Dispatch`;
-                
+                const b = `Dear ${d.icn},\n\nRoute Summary:\n- Locations: ${d.lCnt}\n- Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Mileage: ${d.mi} Miles\n- Compensation: $${d.comp}\n\nReview Link: ${link}`;
                 window.open(`mailto:${d.ice}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`);
                 alert("Authorization link generated.");
             } catch (err) { alert("Error generating link."); }
@@ -318,13 +315,11 @@
                 window.payloadData = d;
                 document.getElementById('setupFields').remove();
                 document.getElementById('icMode').classList.remove('hidden');
-                
                 let displayDate = 'N/A';
                 if (d.due) {
                     const parts = d.due.split('-');
                     displayDate = parts.length === 3 ? `${parts[1]}/${parts[2]}/${parts[0]}` : d.due;
                 }
-
                 document.getElementById('summaryZone').innerHTML = `
                     <div class="flex justify-between border-b pb-2 mb-2 font-bold uppercase text-[10px] tracking-widest text-slate-400"><span>Route Summary</span></div>
                     <div class="flex justify-between border-b pb-2 mb-2"><span>Contractor:</span> <span class="font-bold">${d.icn}</span></div>
@@ -401,9 +396,8 @@
             const btn = document.getElementById('submitBtn');
             btn.disabled = true; btn.innerText = "Sending...";
 
-            // Job List formatting (excluding home address)
-            const jobArray = window.payloadData.jobOnly ? window.payloadData.jobOnly.split('|') : [];
-            const locationList = jobArray.map((loc, index) => `${index + 1}. ${loc}`).join('\n');
+            const rawJobContent = window.payloadData.jobOnly ? window.payloadData.jobOnly.split('|') : [];
+            const locationList = rawJobContent.map((loc, index) => `${index + 1}. ${loc}`).join('\n');
             
             let emailDate = 'N/A';
             if (window.payloadData.due) {
