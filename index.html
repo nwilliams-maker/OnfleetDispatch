@@ -180,54 +180,46 @@
             catch (e) { alert("Save failed"); }
         }
 
-        async function fetchOnfleetTasks() {
-    const homeAddress = document.getElementById('ic_address').value;
-    if (!homeAddress) return alert("Please lookup a contractor first.");
-    const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
-    loader.classList.remove('hidden'); loader.classList.add('flex');
-    syncBtn.disabled = true;
-    
-    try {
-        const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
-        const addressData = await response.json();
-        
-        // The keys of addressData represent UNIQUE locations
-        const addresses = Object.keys(addressData);
-        
-        if (addresses.length === 0) {
-            alert("No unassigned tasks found within 40 miles.");
-            updateBadges(0, 0, 0);
-        } else {
-            let totalTasksGlobal = 0, kioskInstallsGlobal = 0;
-            
-            const formattedList = addresses.map(addr => {
-                const data = addressData[addr];
-                const count = data.count || 0;
-                const kCount = data.kioskCount || 0;
-                
-                totalTasksGlobal += count; 
-                kioskInstallsGlobal += kCount;
-                
-                let entry = addr;
-                // Add labels per unique address
-                if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
-                if (count > 1) entry += ` (${count} Total Tasks)`;
-                return entry;
-            });
-            
-            document.getElementById('locations').value = formattedList.join('\n');
-            
-            // updateBadges(Unique Addresses, Total Tasks across all addresses, Total Kiosks)
-            updateBadges(addresses.length, totalTasksGlobal, kioskInstallsGlobal);
-            calculateLargeRoute();
+        function handleManualEdit() {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = false;
+            btn.classList.remove('opacity-30', 'grayscale', 'cursor-not-allowed');
+            btn.classList.add('opacity-100');
         }
-    } catch (error) { 
-        alert("Sync Error: " + error.message); 
-    } finally { 
-        loader.classList.add('hidden'); 
-        syncBtn.disabled = false; 
-    }
-}
+
+        async function fetchOnfleetTasks() {
+            const homeAddress = document.getElementById('ic_address').value;
+            if (!homeAddress) return alert("Please lookup a contractor first.");
+            const loader = document.getElementById('loaderOverlay'), syncBtn = document.getElementById('syncBtn');
+            loader.classList.remove('hidden'); loader.classList.add('flex');
+            syncBtn.disabled = true;
+            try {
+                const response = await fetch(`${webAppUrl}?action=getOnfleetTasks&homeAddress=${encodeURIComponent(homeAddress)}`);
+                const addressData = await response.json();
+                const addresses = Object.keys(addressData);
+                if (addresses.length === 0) {
+                    alert("No unassigned tasks found within 40 miles.");
+                    updateBadges(0, 0, 0);
+                } else {
+                    let totalTasksGlobal = 0, kioskInstallsGlobal = 0;
+                    const formattedList = addresses.map(addr => {
+                        const data = addressData[addr];
+                        const count = data.count || 0;
+                        const kCount = data.kioskCount || 0;
+                        totalTasksGlobal += count; 
+                        kioskInstallsGlobal += kCount;
+                        let entry = addr;
+                        if (kCount > 0) entry += ` [${kCount} Kiosk Install]`;
+                        if (count > 1) entry += ` (${count} Total Tasks)`;
+                        return entry;
+                    });
+                    document.getElementById('locations').value = formattedList.join('\n');
+                    updateBadges(addresses.length, totalTasksGlobal, kioskInstallsGlobal);
+                    calculateLargeRoute();
+                }
+            } catch (error) { alert("Sync Error: " + error.message); }
+            finally { loader.classList.add('hidden'); syncBtn.disabled = false; }
+        }
 
         function updateBadges(locCount, taskCount, kioskCount) {
             currentLocCount = locCount; currentTaskCount = taskCount; currentKioskCount = kioskCount;
@@ -242,74 +234,79 @@
             } else kBadge.classList.add('hidden');
         }
 
-        // Replace ONLY the calculateLargeRoute function inside your script tag
-function calculateLargeRoute() {
-    clearTimeout(inputTimer);
-    const mileageDisplay = document.getElementById('mileage_display'), 
-          timeDisplay = document.getElementById('time_display'), 
-          compInput = document.getElementById('comp');
-    const home = document.getElementById('ic_address').value.trim(), 
-          textArea = document.getElementById('locations');
-    const lines = textArea.value.split('\n').filter(l => l.trim().length > 5);
-    
-    if (lines.length > 0) {
-        let t = 0, k = 0;
-        lines.forEach(line => {
-            // Regex to find (X Tasks)
-            const tMatch = line.match(/\((\d+)\sTasks\)/i);
-            // Regex to find [X Kiosk Install] - Targeting your specific phrase
-            const kMatch = line.match(/\[(\d+)\sKiosk\sInstall\]/i);
+        function calculateLargeRoute() {
+            clearTimeout(inputTimer);
+            const mileageDisplay = document.getElementById('mileage_display'), timeDisplay = document.getElementById('time_display'), compInput = document.getElementById('comp');
+            const home = document.getElementById('ic_address').value.trim(), textArea = document.getElementById('locations');
+            const lines = textArea.value.split('\n').filter(l => l.trim().length > 5);
             
-            t += tMatch ? parseInt(tMatch[1]) : 1;
-            if (kMatch) {
-                k += parseInt(kMatch[1]);
-            } else if (line.toLowerCase().includes('kiosk install')) {
-                // Fallback if the count isn't in brackets but the text is there
-                k += 1;
-            }
-        });
-        updateBadges(lines.length, t, k);
-    } else updateBadges(0, 0, 0);
+            if (lines.length > 0) {
+                let t = 0, k = 0;
+                lines.forEach(line => {
+                    const tMatch = line.match(/\((\d+)\sTasks\)/i);
+                    // Specifically targeting the phrase Kiosk Install
+                    const kMatch = line.match(/\[(\d+)\sKiosk\sInstall\]/i);
+                    t += tMatch ? parseInt(tMatch[1]) : 1;
+                    if (kMatch) {
+                        k += parseInt(kMatch[1]);
+                    } else if (line.toLowerCase().includes('kiosk install')) {
+                        k += 1;
+                    }
+                });
+                updateBadges(lines.length, t, k);
+            } else updateBadges(0, 0, 0);
 
-    if (lines.length === 0) return;
-    inputTimer = setTimeout(() => {
-        if (!home) return;
-        const stops = lines.map(s => s.replace(/\s[\(\[].*$/, "").trim());
-        directionsService.route({
-            origin: home, destination: home, waypoints: stops.map(l => ({location: l, stopover: true})),
-            optimizeWaypoints: true, travelMode: google.maps.TravelMode.DRIVING
-        }, (result, status) => {
-            if (status === 'OK') {
-                directionsRenderer.setDirections(result);
-                let totalMeters = 0, totalSeconds = 0;
-                result.routes[0].legs.forEach(leg => { totalMeters += leg.distance.value; totalSeconds += leg.duration.value; });
-                mileageDisplay.innerText = (totalMeters * 0.000621371).toFixed(1);
-                const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60);
-                timeDisplay.innerText = h > 0 ? h + "h " + m + "m" : m + "m";
-                compInput.placeholder = `Sug: $${(totalSeconds / 3600 * 30).toFixed(2)}`;
-                window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
-                window.rawJobList = lines; 
-            }
-        });
-    }, 800);
-}
+            if (lines.length === 0) return;
+            inputTimer = setTimeout(() => {
+                if (!home) return;
+                const stops = lines.map(s => s.replace(/\s[\(\[].*$/, "").trim());
+                directionsService.route({
+                    origin: home, destination: home, waypoints: stops.map(l => ({location: l, stopover: true})),
+                    optimizeWaypoints: true, travelMode: google.maps.TravelMode.DRIVING
+                }, (result, status) => {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                        let totalMeters = 0, totalSeconds = 0;
+                        result.routes[0].legs.forEach(leg => { totalMeters += leg.distance.value; totalSeconds += leg.duration.value; });
+                        mileageDisplay.innerText = (totalMeters * 0.000621371).toFixed(1);
+                        const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60);
+                        timeDisplay.innerText = h > 0 ? h + "h " + m + "m" : m + "m";
+                        compInput.placeholder = `Sug: $${(totalSeconds / 3600 * 30).toFixed(2)}`;
+                        window.optimizedSequence = [home, ...result.routes[0].waypoint_order.map(i => stops[i]), home];
+                    }
+                });
+            }, 800);
+        }
 
         function generateCertifiedLink() {
             try {
+                // Strictly capture the job list from the textarea to exclude worker home address
+                const jobListContent = document.getElementById('locations').value.split('\n').filter(l => l.trim().length > 5).join('|');
+
                 const d = {
                     icn: document.getElementById('ic_name_setup').value, ice: document.getElementById('ic_email_setup').value,
                     wo: document.getElementById('task_num').value, due: document.getElementById('due_date').value,
                     comp: document.getElementById('comp').value, mi: document.getElementById('mileage_display').innerText,
                     time: document.getElementById('time_display').innerText, locs: window.optimizedSequence ? window.optimizedSequence.join('|') : "",
-                    lCnt: currentLocCount, tCnt: currentTaskCount, kCnt: currentKioskCount
+                    lCnt: currentLocCount, tCnt: currentTaskCount, kCnt: currentKioskCount,
+                    jobOnly: jobListContent
                 };
                 if (!d.ice || d.mi === "0.0") return alert("Data missing.");
                 const payload = btoa(unescape(encodeURIComponent(JSON.stringify(d))));
                 const link = `${window.location.origin}${window.location.pathname}?data=${payload}`;
                 const s = `Action Required: Terraboost Route Request | WO #${d.wo}`;
-                const b = `Dear ${d.icn},\n\nRoute Summary:\n- Locations: ${d.lCnt}\n- Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Mileage: ${d.mi} Miles\n- Compensation: $${d.comp}\n\nReview Link: ${link}`;
+                
+                // Format date for email body
+                let emailDate = 'N/A';
+                if (d.due) {
+                    const parts = d.due.split('-');
+                    emailDate = parts.length === 3 ? `${parts[1]}/${parts[2]}/${parts[0]}` : d.due;
+                }
+
+                const b = `Dear ${d.icn},\n\nAn optimized route for WO #${d.wo} is ready for your review.\n\nROUTE DETAILS:\n- Due Date: ${emailDate}\n- Total Locations: ${d.lCnt}\n- Total Tasks: ${d.tCnt}\n- Kiosk Installs: ${d.kCnt}\n- Round-Trip Mileage: ${d.mi} Miles\n- Total Compensation: $${d.comp}\n\nPlease click the link below to authorize the route and compensation.\n\nREVIEW LINK: ${link}\n\nRegards,\nTerraboost Media Dispatch`;
+                
                 window.open(`mailto:${d.ice}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`);
-                alert("Authorization link generated. If your email application does not open, go to the PC's settings > Default Apps > Mail to > Select Outlook > Set Default. NOW Click the 'Send to IC' button");
+                alert("Authorization link generated.");
             } catch (err) { alert("Error generating link."); }
         }
 
@@ -335,7 +332,7 @@ function calculateLargeRoute() {
                     <div class="flex justify-between"><span>Due Date:</span> <span class="font-bold">${displayDate}</span></div>
                     <div class="flex justify-between"><span>Unique Locations:</span> <span class="font-bold">${d.lCnt}</span></div>
                     <div class="flex justify-between"><span>Total Tasks:</span> <span class="font-bold">${d.tCnt}</span></div>
-                    <div class="flex justify-between text-emerald-600 font-bold"><span>Kiosk Installs:</span> <span>${d.kCnt}</span></div>
+                    <div class="flex justify-between text-emerald-600 font-bold"><span>Kiosk Installs:</span> <span class="font-bold">${d.kCnt}</span></div>
                     <div class="flex justify-between"><span>Mileage:</span> <span>${d.mi} Miles</span></div>
                     <div class="flex justify-between border-t pt-2 mt-2 font-black text-xl text-emerald-600"><span>Total Comp:</span> <span>$${d.comp}</span></div>
                 `;
@@ -404,10 +401,9 @@ function calculateLargeRoute() {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true; btn.innerText = "Sending...";
 
-            // MODIFIED: Format Locations excluding the first and last (Home Address)
-            const sequenceArray = window.payloadData.locs ? window.payloadData.locs.split('|') : [];
-            const jobListOnly = sequenceArray.length > 2 ? sequenceArray.slice(1, -1) : sequenceArray;
-            const locationList = jobListOnly.map((loc, index) => `${index + 1}. ${loc}`).join('\n');
+            // Job List formatting (excluding home address)
+            const jobArray = window.payloadData.jobOnly ? window.payloadData.jobOnly.split('|') : [];
+            const locationList = jobArray.map((loc, index) => `${index + 1}. ${loc}`).join('\n');
             
             let emailDate = 'N/A';
             if (window.payloadData.due) {
