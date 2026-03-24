@@ -236,7 +236,7 @@
             if (lines.length > 0) {
                 let t = 0, k = 0;
                 lines.forEach(line => {
-                    const tMatch = line.match(/\((\d+)\sTotal\sTasks\)/);
+                    const tMatch = line.match(/\((\d+)\sTasks\)/);
                     const kMatch = line.match(/\[(\d+)\sKiosk/);
                     t += tMatch ? parseInt(tMatch[1]) : 1;
                     k += kMatch ? parseInt(kMatch[1]) : (line.toLowerCase().includes('kiosk install') ? 1 : 0);
